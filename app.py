@@ -12,7 +12,7 @@ UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Placeholder for storing registered filenames and student information
-DATA_FILE = 'registered_data.json'
+DATA_FILE = 'uploads/registered_data.json'
 
 
 def load_registered_data():
