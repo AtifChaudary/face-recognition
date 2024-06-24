@@ -1,11 +1,10 @@
 from flask import Flask, request, jsonify
 import os
 import dlib
-from face_recognition import face_encodings, compare_faces, load_image_file, face_locations, face_landmarks
+from face_recognition import face_encodings, load_image_file, face_locations
 import numpy as np
 import json
 import cv2
-import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 
@@ -47,10 +46,23 @@ def load_and_convert_image(file_path):
     return rgb_image
 
 
+def validate_request(request):
+    required_fields = ['image', 'name', 'student_id']
+
+    combined_data = {**request.form, **request.files}
+    missing_fields = [field for field in required_fields if field not in combined_data]
+
+    if missing_fields:
+        return jsonify({'error': f"{', '.join(missing_fields)} not provided"}), 400
+
+    return None
+
+
 @app.route('/register', methods=['POST'])
 def register():
-    if 'image' not in request.files:
-        return jsonify({'error': 'No image uploaded'}), 400
+    validation_error = validate_request(request)
+    if validation_error:
+        return validation_error
 
     file = request.files['image']
     filename = file.filename
@@ -71,34 +83,35 @@ def register():
 
         shape_predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
 
-
         for face in faces:
             image = load_image_file(file_path)
-
             # Compute face encodings using dlib
             face_loc = face_locations(image)
-            face_landmarks_list = face_landmarks(image)
             face_enc = [
                 face_encodings(image, [face_loc[i]], model="large")[0]
                 for i in range(len(face_loc))
             ]
-            registered_files[filename] = {
-                "filename": filename,
+            registered_files[request.form['student_id']] = {
+                "student_name": request.form['name'],
+                "student_id": request.form['student_id'],
                 "face_encoding": [encoding.tolist() for encoding in face_enc]
             }
             (x, y, w, h) = (face.left(), face.top(), face.width(), face.height())
             cv2.rectangle(gray, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-        cv2.imshow('Detected Faces', gray)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
         save_registered_data(registered_files)
         return jsonify({
-            'message': f'Image uploaded successfully as {filename}',
-            'face_encoding': registered_files[filename]['face_encoding']
+            'status': "OK",
+            'code': 200,
+            'message': f'Student register successfully',
+            'data': {
+                'student_name': registered_files[request.form['student_id']]['student_name'],
+                "student_id": registered_files[request.form['student_id']]['student_id'],
+                'face_encoding': registered_files[request.form['student_id']]['face_encoding']
+            }
         })
     except Exception as e:
+        print(e)
         return jsonify({'error': f"{e}"}), 500
 
 
@@ -113,9 +126,9 @@ def match():
     file.save(file_path)
 
     try:
-        image = load_and_convert_image(file_path)
+        gray = load_and_convert_image(file_path)
         detector = dlib.get_frontal_face_detector()
-        faces = detector(image, 1)
+        faces = detector(gray, 1)
 
         if not faces:
             return jsonify({'error': 'No faces detected in the image'}), 400
@@ -123,15 +136,29 @@ def match():
         shape_predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
 
         for face in faces:
-            face_landmarks = shape_predictor(image, face)
-            face_landmarks_np = np.array([[p.x, p.y] for p in face_landmarks.parts()], dtype=np.int32)
-            uploaded_encoding = face_encodings(image, [face_landmarks.parts()])[0]
+            image = load_image_file(file_path)
+            # Compute face encodings using dlib
+            face_loc = face_locations(image)
+            face_enc = [
+                face_encodings(image, [face_loc[i]], model="large")[0]
+                for i in range(len(face_loc))
+            ]
 
-            for filename, info in registered_files.items():
-                registered_encoding = np.array(info["face_encoding"])
-                match_result = compare_faces([registered_encoding], uploaded_encoding)[0]
-                if match_result:
-                    return jsonify({'filename': filename, 'student_name': info["student_name"]})
+            face_encoded_list = [encoding.tolist() for encoding in face_enc]
+
+            for student in registered_files:
+                known_encoding = registered_files[student]['face_encoding'][0]
+                distance = np.linalg.norm(np.array(known_encoding) - np.array(face_encoded_list[0]))
+                if distance <= 0.6:
+                    return jsonify({
+                        'status': 'OK',
+                        'code': 200,
+                        'message': f'Face match successfully',
+                        'data': {
+                            'student_name': registered_files[student]['student_name'],
+                            "student_id": registered_files[student]['student_id']
+                        }
+                    }), 200
 
         return jsonify({'message': 'No match found'})
     except Exception as e:
