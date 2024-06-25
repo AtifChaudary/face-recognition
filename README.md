@@ -4,8 +4,8 @@ This Flask application implements a basic student attendance system using face r
 
 ## Features:
 
-Registers students by storing their image and face encoding.
-Matches uploaded images against registered faces and identifies the student (if found).
+* Registers students by storing their image and face encoding.
+* Matches uploaded images against registered faces and identifies the student (if found).
 
 
 ## Requirements:
@@ -14,6 +14,7 @@ Matches uploaded images against registered faces and identifies the student (if 
 * Flask
 * dlib (https://github.com/topics/dlib)
 * face_recognition (https://github.com/topics/face-recognition)
+* OpenCV (cv2)
 
 
 ## Project Structure:
@@ -39,19 +40,60 @@ project_name/
 
 1. Run the application: python app.py (or flask run)
 2. **Register Student:**
-   * Send a POST request to `http://localhost:5000/register` with a multipart form data containing the student image file.
-   * The response will indicate successful registration and the filename.
+   * Send a POST request to `http://localhost:5000/register` with a multipart form data containing the student `image` file, `name`, and `student_id`.
+   * The response will indicate successful registration and the student data.
 3. **Match Student:**
-   * Send a POST request to `http://localhost:5000/match` with a multipart form data containing the image to be matched.
-   * The response will contain the filename of the matched student and their name (if found), or a message indicating no match.
+   * Send a POST request to `http://localhost:5000/match` with a multipart form data containing the `image` to be matched.
+   * The response will contain the matched student's name and ID (if found), or a message indicating no match.
 
+## API Endpoints:
+
+### Register Student
+
+* **URL:** `/register`
+* **Method:** `POST`
+* **Parameters:**
+  * `image` (file): Image of the student (JPEG/JPG format)
+  * `name` (string): Name of the student
+  * `student_id` (string): ID of the student
+* **Response:**
+```bash
+{
+    "status": "OK",
+    "code": 200,
+    "message": "Student registered successfully",
+    "data": {
+        "student_name": "John Doe",
+        "student_id": "12345",
+        "face_encoding": [...]
+    }
+}
+```
+
+### Match Student
+
+* **URL:** `/match`
+* **Method:** `POST`
+* **Parameters:**
+  * `image` (file): Image to be matched
+* **Response:**
+```bash
+{
+    "status": "OK",
+    "code": 200,
+    "message": "Face match successfully",
+    "data": {
+        "student_name": "John Doe",
+        "student_id": "12345"
+    }
+}
+```
 
 ## Note:
 
 * This is a basic implementation and can be further enhanced with features like error handling, security measures, and a database for student information.
 * The face recognition accuracy depends on various factors like lighting and image quality.
 
-
 ## Credits:
 
-* This project utilizes libraries like Flask, dlib, and face_recognition. Refer to their respective documentation for further details.
+* This project utilizes libraries like Flask, dlib, face_recognition, and OpenCV. Refer to their respective documentation for further details.
